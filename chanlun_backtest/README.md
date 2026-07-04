@@ -11,12 +11,13 @@ K线上做了真实回测，统计真实胜率、盈亏比与收益曲线。
 
 ```
 chanlun_backtest/
-├── download_data.py    # 从 Binance 官方公开历史数据集下载 K 线（免 API Key）
-├── chanlun_engine.py    # 缠论核心：笔（调用 rs_czsc）+ 中枢/背驰/买卖点（自实现，因果式）
-├── backtest.py           # 信号 -> 交易撮合 + 绩效统计（胜率/盈亏比/回撤等）
-├── run_backtest.py       # 一键运行三个周期的回测并输出结果
-├── data/                 # 下载的历史K线（parquet，未提交到 git，需要自行下载）
-└── results/               # 回测结果（交易明细 csv + 汇总 json）
+├── download_data.py             # 从 Binance 官方公开历史数据集下载 K 线（免 API Key）
+├── chanlun_engine.py             # 缠论核心：笔（调用 rs_czsc）+ 中枢/背驰/买卖点/多级别联立（自实现，因果式）
+├── backtest.py                    # 信号 -> 交易撮合 + 绩效统计（胜率/盈亏比/回撤等）
+├── run_backtest.py                # 单周期回测（1m/5m/30m 各自独立）
+├── run_backtest_multilevel.py     # 多级别联立回测（30m定方向→5m，5m定方向→1m）
+├── data/                          # 下载的历史K线（parquet，未提交到 git，需要自行下载）
+└── results/                        # 回测结果（交易明细 csv + 汇总 json）
 ```
 
 ## 复现方法
@@ -27,8 +28,11 @@ pip install czsc pandas numpy pyarrow requests
 # 1. 下载数据（默认 PEPEUSDT，2025-06 ~ 2026-05，可换其他币种/区间）
 python download_data.py PEPEUSDT 2025-06 2026-05
 
-# 2. 跑三个周期的回测（默认手续费单边 0.1%，即双边 0.2%）
+# 2a. 跑三个周期各自独立的回测（默认手续费单边 0.1%，即双边 0.2%）
 python run_backtest.py --symbol PEPEUSDT --freqs 1m 5m 30m --fee 0.001
+
+# 2b. 跑多级别联立回测（30分钟定方向->5分钟找买卖点；5分钟定方向->1分钟找买卖点）
+python run_backtest_multilevel.py --symbol PEPEUSDT --fee 0.001
 ```
 
 ## 为什么选择 PEPEUSDT

@@ -90,6 +90,47 @@ class ZhongShu:
     end_idx: int    # bis 列表中的结束下标（含）
 
 
+class TrendTimeline:
+    """大级别笔方向时间线，供小级别做"多级别联立"过滤使用
+
+    因果性说明
+    ----------
+    时间线由大级别**已经绝对确认**的笔（ChanEngine.run 返回的 confirmed_bis）构建而成。
+    查询 direction_at(dt) 时，只会返回"起点时间 <= dt 的最后一笔"的方向——也就是说，
+    对于任意查询时刻 dt，返回的都是在该时刻**理论上已经可以观察到**的大级别方向，
+    绝不会用到 dt 之后才形成的笔。因此即使实现上一次性构建了整条时间线（图方便），
+    只要查询逻辑严格满足"只看 fx_a.dt <= dt 的笔"，就不构成未来函数。
+    """
+
+    def __init__(self, confirmed_bis):
+        self.starts = [b.fx_a.dt for b in confirmed_bis]
+        self.bis = confirmed_bis
+
+    def direction_at(self, dt) -> Optional[Direction]:
+        """返回 dt 时刻"正在进行/刚结束"的大级别笔方向；大级别数据尚未开始时返回 None"""
+        import bisect
+
+        idx = bisect.bisect_right(self.starts, dt) - 1
+        if idx < 0:
+            return None
+        return self.bis[idx].direction
+
+    def allows(self, point) -> bool:
+        """多级别联立过滤规则："顺大级别方向而为"
+
+        大级别笔方向为"向上"时，只允许小级别的买点通过（大级别上涨中找小级别低点买入）；
+        大级别笔方向为"向下"时，只允许小级别的卖点通过（大级别下跌中找小级别高点卖出）。
+        大级别数据缺失（回测起始阶段）时保守放行，避免因数据不足而丢失全部早期信号。
+        """
+        large_dir = self.direction_at(point.dt)
+        if large_dir is None:
+            return True
+        if point.side == "buy":
+            return large_dir == Direction.Up
+        else:
+            return large_dir == Direction.Down
+
+
 @dataclass
 class BSPoint:
     kind: str          # '一买' '二买' '三买' '一卖' '二卖' '三卖'
@@ -275,12 +316,13 @@ class ChanEngine:
 
         返回
         ----
-        (all_points, exec_bar_ids, c, stats)
-            all_points:   按检测顺序排列的 BSPoint 列表
-            exec_bar_ids: 与 all_points 一一对应，标记该信号"最早可能被实盘发现"
-                          时所在的K线 id（用于回测以其下一根K线开盘价成交）
-            stats:        {"max_retraction_observed": int, "n_polls_verified": int}
-                          运行时自证的统计信息
+        (all_points, exec_bar_ids, c, stats, confirmed_bis)
+            all_points:    按检测顺序排列的 BSPoint 列表
+            exec_bar_ids:  与 all_points 一一对应，标记该信号"最早可能被实盘发现"
+                           时所在的K线 id（用于回测以其下一根K线开盘价成交）
+            stats:         {"max_retraction_observed": int, "n_polls_verified": int}
+                           运行时自证的统计信息
+            confirmed_bis: 全部"绝对确认"的笔列表（用于多级别联立时构建大级别趋势时间线）
         """
         bars = self.bars
         c = czsc.CZSC(bars[:warmup], max_bi_num=max(len(bars), 1000))
@@ -293,6 +335,7 @@ class ChanEngine:
         prev_bi_list = c.bi_list
         last_confirmed = confirmed_len(prev_bi_list)
         prev_confirmed_fps = [self._bi_fingerprint(b) for b in prev_bi_list[:last_confirmed]]
+        final_confirmed_bis = prev_bi_list[:last_confirmed]
 
         max_retraction_observed = 0
         n_polls_verified = 0
@@ -334,6 +377,7 @@ class ChanEngine:
                         exec_bar_ids.append(current_bar_id)
                 last_confirmed = n_confirmed
                 prev_confirmed_fps = [self._bi_fingerprint(b) for b in safe_bis]
+                final_confirmed_bis = safe_bis
 
             prev_bi_list = bi_list
 
@@ -342,4 +386,4 @@ class ChanEngine:
             "n_polls_verified": n_polls_verified,
             "safety_margin_used": safety_margin,
         }
-        return all_points, exec_bar_ids, c, stats
+        return all_points, exec_bar_ids, c, stats, final_confirmed_bis

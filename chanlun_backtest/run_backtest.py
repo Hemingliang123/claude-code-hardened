@@ -43,7 +43,7 @@ def main():
         while True:
             try:
                 engine = ChanEngine(bars)
-                points, exec_bar_ids, c, verify_stats = engine.run(
+                points, exec_bar_ids, c, verify_stats, _confirmed_bis = engine.run(
                     warmup=WARMUP[freq], poll_chunk=POLL_CHUNK[freq], safety_margin=safety_margin
                 )
                 break
