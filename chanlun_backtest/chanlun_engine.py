@@ -1,0 +1,299 @@
+"""
+阿娇版缠论（缠中说禅《教你炒股票》108课体系）—— 因果式（无未来函数）实现
+
+设计原则
+--------
+1. 笔的构建（K线包含处理 -> 分型 -> 笔）完全交给 rs_czsc（czsc 库的 Rust 高性能内核）。
+   该内核是逐根K线增量更新（c.update(bar)）的流式算法：计算第 i 根K线时刻的笔，
+   只使用 <= i 的历史K线，past 的笔一旦确认绝不会被后续K线"重绘"（无未来函数）。
+   这是国内量化圈使用最广泛、经过大量实盘检验的开源缠论实现。
+
+2. 中枢、背驰、三类买卖点由本文件实现，规则如下（全部只使用当前时刻及之前的信息）：
+
+   中枢（走势中枢）
+   ----------------
+   取连续 3 笔，若三笔的高低区间存在重叠（zg=三笔最高点中的最小值 >= zd=三笔最低点中的最大值），
+   则构成一个中枢候选，之后每新增一笔，若其价格区间与 [zd, zg] 仍有重叠则并入中枢延伸，
+   直至出现一笔与 [zd, zg] 完全没有重叠（"离开笔"），中枢在此确认结束。
+
+   背驰（用于第一类买卖点）
+   ----------------
+   比较"当前笔"与同方向的上一笔（隔一笔）的力度：
+     a) 价格力度（百分比涨跌幅，见 _bi_price_power，注意不能直接用 czsc 自带的
+        power_price，详见下方"已修复的 bug"说明）
+     b) MACD 同向面积（该笔覆盖的原始K线上，红/绿柱面积之和）
+   若价格创新高/新低，但 (a) 和 (b) 同时走弱，判定为背驰。
+
+   三类买卖点
+   ----------------
+   一买/一卖：下跌（上涨）趋势的最后一笔相对于上一同向笔背驰，笔端点confirm后为一类买/卖点。
+   二买/二卖：一类买卖点后，反向笔不创新低/新高（不破一类买卖点的极值），该笔端点为二类买卖点。
+   三买/三卖：中枢结束后的离开笔 + 回抽笔不回到中枢区间（[zd,zg]）内，回抽笔端点为三类买卖点。
+
+3. 交易执行为"信号确认K线的下一根K线开盘价成交"，避免任何同根K线内的未来信息渗透。
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Optional
+
+import numpy as np
+import pandas as pd
+
+import czsc
+from czsc import Direction, Freq, RawBar
+
+
+FREQ_MAP = {"1m": Freq.F1, "5m": Freq.F5, "30m": Freq.F30}
+
+
+def load_bars(parquet_path: str, symbol: str, freq_key: str) -> List[RawBar]:
+    df = pd.read_parquet(parquet_path)
+    df = df.sort_values("open_time").reset_index(drop=True)
+    freq = FREQ_MAP[freq_key]
+    bars = []
+    for i, row in enumerate(df.itertuples(index=False)):
+        bars.append(
+            RawBar(
+                symbol=symbol,
+                id=i,
+                dt=row.open_time.to_pydatetime(),
+                freq=freq,
+                open=float(row.open),
+                close=float(row.close),
+                high=float(row.high),
+                low=float(row.low),
+                vol=float(row.volume),
+                amount=float(row.quote_volume),
+            )
+        )
+    return bars
+
+
+def compute_macd(closes: np.ndarray, fast=12, slow=26, signal=9):
+    """标准 MACD，纯因果计算（EMA 只依赖历史数据）"""
+    s = pd.Series(closes)
+    ema_fast = s.ewm(span=fast, adjust=False).mean()
+    ema_slow = s.ewm(span=slow, adjust=False).mean()
+    dif = ema_fast - ema_slow
+    dea = dif.ewm(span=signal, adjust=False).mean()
+    macd = (dif - dea) * 2
+    return dif.values, dea.values, macd.values
+
+
+@dataclass
+class ZhongShu:
+    bis: list
+    zg: float
+    zd: float
+    start_idx: int  # bis 列表中的起始下标（含）
+    end_idx: int    # bis 列表中的结束下标（含）
+
+
+@dataclass
+class BSPoint:
+    kind: str          # '一买' '二买' '三买' '一卖' '二卖' '三卖'
+    side: str          # 'buy' or 'sell'
+    dt: object
+    price: float        # 分型确认价格（fx.fx）
+    bar_id: int          # 触发信号的笔端点所在原始K线 id（用于确定下一根K线执行）
+
+
+class ChanEngine:
+    def __init__(self, bars: List[RawBar], macd_fast=12, macd_slow=26, macd_signal=9):
+        self.bars = bars
+        closes = np.array([b.close for b in bars])
+        self.dif, self.dea, self.macd = compute_macd(closes, macd_fast, macd_slow, macd_signal)
+        self.bar_id_to_idx = {b.id: i for i, b in enumerate(bars)}
+        # 记录"最近一次确认的一买/一卖"在笔序列中的下标，供二类买卖点严格锚定
+        # （二类买卖点必须紧跟在真实的一类买卖点之后，而不是任意同向笔之后）
+        self._last_1b_idx: Optional[int] = None
+        self._last_1s_idx: Optional[int] = None
+
+    @staticmethod
+    def _bi_price_power(bi) -> float:
+        """笔的价格力度：使用百分比涨跌幅而非绝对价差
+
+        注意：rs_czsc/czsc 库自带的 BI.power_price 内部对价格差做了 round(x, 2)，
+        对于 PEPE 这类价格在 1e-5 量级的币种会被直接舍入成 0，导致背驰判断永远失效。
+        因此这里不使用库自带的 power_price，而是基于原始 fx_a/fx_b 价格自行计算
+        百分比力度，同时具备跨价格量级的可比性。
+        """
+        return abs(bi.fx_b.fx - bi.fx_a.fx) / bi.fx_a.fx
+
+    def _bi_macd_area(self, bi) -> float:
+        """笔覆盖的原始K线区间内，与笔方向一致的 MACD 柱面积之和（绝对值）"""
+        raw_ids = [b.id for b in bi.raw_bars]
+        if not raw_ids:
+            return 0.0
+        idxs = [self.bar_id_to_idx[i] for i in raw_ids if i in self.bar_id_to_idx]
+        if not idxs:
+            return 0.0
+        seg = self.macd[min(idxs): max(idxs) + 1]
+        if bi.direction == Direction.Down:
+            area = -seg[seg < 0].sum()
+        else:
+            area = seg[seg > 0].sum()
+        return float(area)
+
+    def build_zhongshu_list(self, bi_list) -> List[ZhongShu]:
+        """从笔序列因果式构建中枢列表（仅使用当前及之前的笔）"""
+        zs_list = []
+        i = 0
+        n = len(bi_list)
+        while i + 2 < n:
+            b1, b2, b3 = bi_list[i], bi_list[i + 1], bi_list[i + 2]
+            zg = min(b1.high, b2.high, b3.high)
+            zd = max(b1.low, b2.low, b3.low)
+            if zg < zd:
+                i += 1
+                continue
+            # 候选中枢确认，尝试向后延伸
+            j = i + 3
+            while j < n:
+                bj = bi_list[j]
+                # 是否与中枢区间存在重叠
+                if bj.high >= zd and bj.low <= zg:
+                    j += 1
+                else:
+                    break
+            zs_list.append(ZhongShu(bis=bi_list[i:j], zg=zg, zd=zd, start_idx=i, end_idx=j - 1))
+            i = j
+        return zs_list
+
+    def detect_signals(self, bi_list) -> List[BSPoint]:
+        """基于当前已确认的笔序列（因果式，不使用任何未来笔）检测三类买卖点
+
+        仅在"新确认一笔"的时刻调用（即 bi_list 是某一时刻的完整因果快照），
+        返回该时刻由最后一笔触发的买卖点（如果有）。
+        """
+        points: List[BSPoint] = []
+        if len(bi_list) < 3:
+            return points
+
+        last = bi_list[-1]
+        zs_list = self.build_zhongshu_list(bi_list[:-1])  # 中枢基于"上一笔为止"的历史构建
+
+        # ---------- 一类买卖点：背驰 ----------
+        if len(bi_list) >= 3:
+            prev_same_dir = bi_list[-3]  # 上一同向笔
+            if prev_same_dir.direction == last.direction:
+                price_new_extreme = (
+                    last.low < prev_same_dir.low if last.direction == Direction.Down
+                    else last.high > prev_same_dir.high
+                )
+                if price_new_extreme:
+                    weaker_price = self._bi_price_power(last) < self._bi_price_power(prev_same_dir)
+                    weaker_macd = self._bi_macd_area(last) < self._bi_macd_area(prev_same_dir)
+                    if weaker_price and weaker_macd:
+                        kind = "一买" if last.direction == Direction.Down else "一卖"
+                        side = "buy" if kind == "一买" else "sell"
+                        points.append(BSPoint(kind, side, last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
+                        last_idx = len(bi_list) - 1
+                        if kind == "一买":
+                            self._last_1b_idx = last_idx
+                        else:
+                            self._last_1s_idx = last_idx
+
+        # ---------- 二类买卖点（严格锚定在真实一类买卖点之后） ----------
+        # 标准定义：一买（一卖）之后，价格反向运行一笔，再次出现同向笔，
+        # 若该笔不创一买的新低（不创一卖的新高），则该笔端点为二买（二卖）。
+        # 这里要求 last 必须恰好是"上一次确认的一买/一卖"之后的第 2 笔（即紧邻的下一个同向笔），
+        # 而不是任意历史同向笔，避免把普通的高低点结构误判为二类买卖点。
+        last_idx = len(bi_list) - 1
+        if self._last_1b_idx is not None and last_idx == self._last_1b_idx + 2:
+            x = bi_list[self._last_1b_idx]
+            if last.direction == Direction.Down and last.low > x.low:
+                points.append(BSPoint("二买", "buy", last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
+        if self._last_1s_idx is not None and last_idx == self._last_1s_idx + 2:
+            x = bi_list[self._last_1s_idx]
+            if last.direction == Direction.Up and last.high < x.high:
+                points.append(BSPoint("二卖", "sell", last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
+
+        # ---------- 三类买卖点 ----------
+        # 使用刚构建的中枢列表（基于 last 之前的笔）：若 last 紧接在某中枢结束之后，
+        # 且 last 与"离开笔"方向相反（回抽），并且 last 未回到中枢区间 [zd, zg] 内
+        if zs_list:
+            zs = zs_list[-1]
+            leave_idx = zs.end_idx + 1  # 离开笔在 bi_list（不含last）中的下标
+            # last 应紧跟在离开笔之后一笔
+            if leave_idx == len(bi_list) - 2:
+                leave_bi = bi_list[leave_idx]
+                if leave_bi.direction != last.direction:
+                    if leave_bi.direction == Direction.Up and last.low > zs.zg:
+                        points.append(BSPoint("三买", "buy", last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
+                    elif leave_bi.direction == Direction.Down and last.high < zs.zd:
+                        points.append(BSPoint("三卖", "sell", last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
+
+        # 同一笔理论上只能是买方向或卖方向之一，但同一方向内可能被多条规则同时命中
+        # （例如同时满足一买和二买的结构条件），此时按 一类 > 二类 > 三类 优先级只保留一个，
+        # 避免同一价位重复触发交易信号。
+        if points:
+            priority = {"一买": 0, "二买": 1, "三买": 2, "一卖": 0, "二卖": 1, "三卖": 2}
+            points.sort(key=lambda p: priority[p.kind])
+            points = [points[0]]
+        return points
+
+    def run(self, warmup: int = 100, poll_chunk: int = 200):
+        """逐根K线因果式增量运行，返回按时间顺序排列的全部买卖点信号
+
+        关键的"无未来函数"细节（务必阅读）
+        --------------------------------
+        实测发现 rs_czsc 的 bi_list 最后 1 个元素是"延伸中的笔"：随着新K线到来，
+        它的端点（fx_b）会被原地修改，甚至可能被撤销（长度回退1）。也就是说，
+        如果我们在笔刚出现时就用它去判断买卖点，等于用到了"未来才会确定"的信息，
+        这正是 chanlun 软件最常见的未来函数陷阱。
+
+        经过实测验证（对比同一下标元素在不同时刻的取值），只有当 bi_list 的长度
+        已经超过某下标至少 2 时，该下标对应的笔才保证不再变化（留 1 笔安全冗余，
+        因为实测中最深回退仅为 1 笔）。因此：
+
+            confirmed_bis = bi_list[:-2]
+
+        才是"绝对安全、只依赖过去信息"的笔序列，本回测的所有中枢构建、背驰判断、
+        买卖点识别都只使用 confirmed_bis。
+
+        性能说明（不影响因果性，只影响我们"多久检查一次"）
+        --------------------------------
+        c.bi_list 每次访问都会把 Rust 端的笔对象整体转换为 Python 对象，成本随当前
+        笔数量线性增长，逐根K线都访问会导致整体 O(n^2)。这里改为每 poll_chunk 根
+        K线才检查一次。这只是延后了"我们何时发现新确认笔"的时间点，不会让策略
+        提前用到未来数据——因为信号一旦被发现，其执行价格固定为"发现时刻所在K线
+        的下一根K线开盘价"，而不是笔端点历史时刻的下一根K线（那样才是真正的未来
+        函数）。
+
+        返回
+        ----
+        (all_points, exec_bar_ids, c)
+            all_points:   按检测顺序排列的 BSPoint 列表
+            exec_bar_ids: 与 all_points 一一对应，标记该信号"最早可能被实盘发现"
+                          时所在的K线 id（用于回测以其下一根K线开盘价成交）
+        """
+        bars = self.bars
+        c = czsc.CZSC(bars[:warmup], max_bi_num=max(len(bars), 1000))
+        all_points: List[BSPoint] = []
+        exec_bar_ids: List[int] = []
+
+        def confirmed_len(bi_list):
+            return max(len(bi_list) - 2, 0)
+
+        last_confirmed = confirmed_len(c.bi_list)
+
+        buf = bars[warmup:]
+        for start in range(0, len(buf), poll_chunk):
+            chunk = buf[start: start + poll_chunk]
+            for b in chunk:
+                c.update(b)
+            bi_list = c.bi_list
+            n_confirmed = confirmed_len(bi_list)
+            if n_confirmed > last_confirmed:
+                safe_bis = bi_list[:n_confirmed]
+                current_bar_id = chunk[-1].id  # 本轮轮询"发现"新确认笔时所在的K线
+                for k in range(last_confirmed + 1, n_confirmed + 1):
+                    pts = self.detect_signals(safe_bis[:k])
+                    for p in pts:
+                        all_points.append(p)
+                        exec_bar_ids.append(current_bar_id)
+                last_confirmed = n_confirmed
+
+        return all_points, exec_bar_ids, c
