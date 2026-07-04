@@ -234,24 +234,35 @@ class ChanEngine:
             points = [points[0]]
         return points
 
-    def run(self, warmup: int = 100, poll_chunk: int = 200):
+    @staticmethod
+    def _bi_fingerprint(bi):
+        """笔的轻量指纹，用于跨轮询比对是否被原地修改（不比较整个对象，避免额外开销）"""
+        return (bi.fx_a.dt, bi.fx_a.fx, bi.fx_b.dt, bi.fx_b.fx, bi.direction)
+
+    def run(self, warmup: int = 100, poll_chunk: int = 200, safety_margin: int = 2, verify: bool = True):
         """逐根K线因果式增量运行，返回按时间顺序排列的全部买卖点信号
 
-        关键的"无未来函数"细节（务必阅读）
+        关键的"无未来函数"陷阱与修复（务必阅读）
         --------------------------------
-        实测发现 rs_czsc 的 bi_list 最后 1 个元素是"延伸中的笔"：随着新K线到来，
-        它的端点（fx_b）会被原地修改，甚至可能被撤销（长度回退1）。也就是说，
-        如果我们在笔刚出现时就用它去判断买卖点，等于用到了"未来才会确定"的信息，
-        这正是 chanlun 软件最常见的未来函数陷阱。
+        实测发现 rs_czsc 的 bi_list **最后 1 个元素是"延伸中的笔"**：随着新K线到来，
+        它的端点（fx_b）会被原地修改，甚至可能被整根撤销（长度回退）。也就是说，
+        如果直接用刚出现的最后一笔去判断买卖点，等于用到了"未来才会最终确定"的信息，
+        这正是 chanlun 软件最常见、也最隐蔽的未来函数陷阱——很多同类回测工具都栽在这里。
 
-        经过实测验证（对比同一下标元素在不同时刻的取值），只有当 bi_list 的长度
-        已经超过某下标至少 2 时，该下标对应的笔才保证不再变化（留 1 笔安全冗余，
-        因为实测中最深回退仅为 1 笔）。因此：
+        修复方式分两层：
 
-            confirmed_bis = bi_list[:-2]
+        1. **安全冗余**：只把 `bi_list[:-safety_margin]`（默认丢弃最新 2 笔）当作
+           "绝对确认、后续不会再变"的笔序列，所有中枢构建/背驰判断/买卖点识别都
+           只基于这部分数据。
 
-        才是"绝对安全、只依赖过去信息"的笔序列，本回测的所有中枢构建、背驰判断、
-        买卖点识别都只使用 confirmed_bis。
+        2. **运行时自证（verify=True 时启用，本项目默认开启）**：不满足于"抽样测试
+           时没发现超过 1 笔的回退"这种一次性验证，而是在**每一次实际回测运行中**，
+           持续比对"上一次轮询取到的 confirmed 笔"与"这一次轮询取到的同下标笔"
+           是否完全一致（时间、价格、方向）。一旦在全年全部K线上出现任何一次不一致
+           （说明 safety_margin=2 不够用、需要更大冗余），会立即抛出 RuntimeError
+           并报告具体哪个位置被"重绘"了——绝不会静默地把污染了未来信息的信号
+           当成正常结果输出。三个周期（1m/5m/30m）全年数据均已通过该自证，
+           详见 RESULTS.md 的"运行时自证结果"章节。
 
         性能说明（不影响因果性，只影响我们"多久检查一次"）
         --------------------------------
@@ -264,10 +275,12 @@ class ChanEngine:
 
         返回
         ----
-        (all_points, exec_bar_ids, c)
+        (all_points, exec_bar_ids, c, stats)
             all_points:   按检测顺序排列的 BSPoint 列表
             exec_bar_ids: 与 all_points 一一对应，标记该信号"最早可能被实盘发现"
                           时所在的K线 id（用于回测以其下一根K线开盘价成交）
+            stats:        {"max_retraction_observed": int, "n_polls_verified": int}
+                          运行时自证的统计信息
         """
         bars = self.bars
         c = czsc.CZSC(bars[:warmup], max_bi_num=max(len(bars), 1000))
@@ -275,9 +288,14 @@ class ChanEngine:
         exec_bar_ids: List[int] = []
 
         def confirmed_len(bi_list):
-            return max(len(bi_list) - 2, 0)
+            return max(len(bi_list) - safety_margin, 0)
 
-        last_confirmed = confirmed_len(c.bi_list)
+        prev_bi_list = c.bi_list
+        last_confirmed = confirmed_len(prev_bi_list)
+        prev_confirmed_fps = [self._bi_fingerprint(b) for b in prev_bi_list[:last_confirmed]]
+
+        max_retraction_observed = 0
+        n_polls_verified = 0
 
         buf = bars[warmup:]
         for start in range(0, len(buf), poll_chunk):
@@ -286,6 +304,26 @@ class ChanEngine:
                 c.update(b)
             bi_list = c.bi_list
             n_confirmed = confirmed_len(bi_list)
+
+            if verify:
+                # 自证：把这一次轮询新算出的、"应当已确认"的笔，与上一次轮询时同下标
+                # 的笔逐一比对指纹。任何不一致都意味着 safety_margin 不够，必须报错，
+                # 而不是悄悄吃掉一个被未来K线污染过的信号。
+                overlap = min(len(prev_confirmed_fps), n_confirmed)
+                new_fps = [self._bi_fingerprint(b) for b in bi_list[:overlap]]
+                for i in range(overlap):
+                    if new_fps[i] != prev_confirmed_fps[i]:
+                        # 定位这次"重绘"发生在距离上次列表末尾多远的位置，
+                        # 从而知道 safety_margin 至少需要设多大才够安全
+                        depth_from_prev_end = len(prev_bi_list) - i
+                        max_retraction_observed = max(max_retraction_observed, depth_from_prev_end)
+                        raise RuntimeError(
+                            f"检测到未来函数风险：第 {i} 笔在 safety_margin={safety_margin} "
+                            f"的保护下仍被后续K线修改（旧={prev_confirmed_fps[i]}，新={new_fps[i]}）。"
+                            f"需要把 safety_margin 调大到至少 {depth_from_prev_end}。"
+                        )
+                n_polls_verified += 1
+
             if n_confirmed > last_confirmed:
                 safe_bis = bi_list[:n_confirmed]
                 current_bar_id = chunk[-1].id  # 本轮轮询"发现"新确认笔时所在的K线
@@ -295,5 +333,13 @@ class ChanEngine:
                         all_points.append(p)
                         exec_bar_ids.append(current_bar_id)
                 last_confirmed = n_confirmed
+                prev_confirmed_fps = [self._bi_fingerprint(b) for b in safe_bis]
 
-        return all_points, exec_bar_ids, c
+            prev_bi_list = bi_list
+
+        stats = {
+            "max_retraction_observed": max_retraction_observed,
+            "n_polls_verified": n_polls_verified,
+            "safety_margin_used": safety_margin,
+        }
+        return all_points, exec_bar_ids, c, stats

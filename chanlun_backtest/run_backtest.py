@@ -24,7 +24,12 @@ def main():
     result_dir = os.path.join(os.path.dirname(__file__), "results")
     os.makedirs(result_dir, exist_ok=True)
 
+    summary_path = os.path.join(result_dir, f"{args.symbol}_summary.json")
     summary = {}
+    if os.path.exists(summary_path):
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = json.load(f)
+
     for freq in args.freqs:
         parquet_path = os.path.join(data_dir, f"{args.symbol}-{freq}-{args.start}_to_{args.end}.parquet")
         print(f"\n=== {args.symbol} {freq} ===")
@@ -32,15 +37,29 @@ def main():
         bars = load_bars(parquet_path, args.symbol, freq)
         print(f"K线数量: {len(bars)}")
 
-        engine = ChanEngine(bars)
-        points, exec_bar_ids, c = engine.run(warmup=WARMUP[freq], poll_chunk=POLL_CHUNK[freq])
+        # 若运行时自证发现 safety_margin 不够（说明某一笔被回退的深度超出预期），
+        # 自动加大冗余重跑，直到全年数据都通过自证为止，绝不带着未验证的假设出结果。
+        safety_margin = 2
+        while True:
+            try:
+                engine = ChanEngine(bars)
+                points, exec_bar_ids, c, verify_stats = engine.run(
+                    warmup=WARMUP[freq], poll_chunk=POLL_CHUNK[freq], safety_margin=safety_margin
+                )
+                break
+            except RuntimeError as e:
+                print(f"[自证失败，safety_margin={safety_margin}] {e}")
+                safety_margin += 2
+                print(f"提高 safety_margin 至 {safety_margin} 后重试...")
         print(f"笔数量: {len(c.bi_list)}  信号数量: {len(points)}  耗时: {time.time()-t0:.1f}s")
+        print(f"未来函数自证通过: {verify_stats}")
 
         trades = run_backtest(bars, points, exec_bar_ids, fee_rate=args.fee)
         stats = evaluate_trades(trades)
         stats["笔总数"] = len(c.bi_list)
         stats["信号总数"] = len(points)
         stats["K线数量"] = len(bars)
+        stats["未来函数自证"] = verify_stats
         print(json.dumps(stats, ensure_ascii=False, indent=2))
 
         df = trades_to_df(trades)
@@ -50,7 +69,6 @@ def main():
 
         summary[freq] = stats
 
-    summary_path = os.path.join(result_dir, f"{args.symbol}_summary.json")
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
     print(f"\n汇总结果已保存: {summary_path}")
