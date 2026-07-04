@@ -254,17 +254,29 @@ class ChanEngine:
         # ---------- 三类买卖点 ----------
         # 使用刚构建的中枢列表（基于 last 之前的笔）：若 last 紧接在某中枢结束之后，
         # 且 last 与"离开笔"方向相反（回抽），并且 last 未回到中枢区间 [zd, zg] 内
+        #
+        # 已修复的 bug：此前用 leave_bi.direction（该笔自身是"向上笔"还是"向下笔"）
+        # 来判断离开中枢是"向上离开"还是"向下离开"，但这是两个不同的概念——一笔的
+        # 涨跌方向不等于它相对中枢的几何位置。例如中枢向下跌破往往发生在"上一笔"
+        # （仍与 [zd,zg] 有重叠、因此被计入中枢内部）已经跌穿 zd，而真正被判定为
+        # "不再重叠"的 leave_bi 可能是随后一笔纯粹低位反弹的"向上笔"，其整个价格区间
+        # 依然完全在 zd 下方。这种情况下 leave_bi.direction 会被误判为"向上离开"，
+        # 导致代码去检查根本不相关的上沿 zg，而不是真正发生突破的下沿 zd，使得三类
+        # 买卖点的价格条件在实测中 100% 无法满足（见 COMPARISON.md/BUGS.md 的诊断）。
+        # 修复方式：直接用 leave_bi 自身的价格区间相对 [zd, zg] 的几何位置判断离开方向，
+        # 不再依赖 leave_bi.direction 这个无关的笔涨跌方向标签。
         if zs_list:
             zs = zs_list[-1]
             leave_idx = zs.end_idx + 1  # 离开笔在 bi_list（不含last）中的下标
             # last 应紧跟在离开笔之后一笔
             if leave_idx == len(bi_list) - 2:
                 leave_bi = bi_list[leave_idx]
-                if leave_bi.direction != last.direction:
-                    if leave_bi.direction == Direction.Up and last.low > zs.zg:
-                        points.append(BSPoint("三买", "buy", last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
-                    elif leave_bi.direction == Direction.Down and last.high < zs.zd:
-                        points.append(BSPoint("三卖", "sell", last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
+                left_above = leave_bi.low > zs.zg    # 离开笔整体在中枢上方（向上离开）
+                left_below = leave_bi.high < zs.zd   # 离开笔整体在中枢下方（向下离开）
+                if left_above and last.low > zs.zg:
+                    points.append(BSPoint("三买", "buy", last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
+                elif left_below and last.high < zs.zd:
+                    points.append(BSPoint("三卖", "sell", last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
 
         # 同一笔理论上只能是买方向或卖方向之一，但同一方向内可能被多条规则同时命中
         # （例如同时满足一买和二买的结构条件），此时按 一类 > 二类 > 三类 优先级只保留一个，
