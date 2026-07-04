@@ -13,6 +13,11 @@ ZECUSDT**（三个波动特征完全不同的币种：持续阴跌、深跌+逼�
 - PEPEUSDT vs ORDIUSDT 双币种对比见 [`COMPARISON.md`](./COMPARISON.md)
 - **逻辑依据与逻辑漏洞深度检验（含三类买卖点 bug 修复、随机基线显著性检验、ZECUSDT
   牛市对照、whipsaw证据）见 [`LOGIC_ANALYSIS.md`](./LOGIC_ANALYSIS.md)——建议优先阅读**
+- **SMC（Smart Money Concepts：失衡区/订单块/结构突破）审查、重写与实测对照见
+  [`SMC_ANALYSIS.md`](./SMC_ANALYSIS.md)**——审查了一版用户提供的 SMC 代码（发现分块
+  边界断档、未来函数、订单块方向定义矛盾三个实质性 bug），按同一套因果性标准重写后
+  实测：SMC 信号胜率在全部 54 个"数据集×子集"组合上无一例外显著低于随机基线，
+  与缠论买卖点组合确认后胜率提升但会误伤贡献主要收益的关键信号
 
 ## 目录结构
 
@@ -20,9 +25,14 @@ ZECUSDT**（三个波动特征完全不同的币种：持续阴跌、深跌+逼�
 chanlun_backtest/
 ├── download_data.py             # 从 Binance 官方公开历史数据集下载 K 线（免 API Key）
 ├── chanlun_engine.py             # 缠论核心：笔（调用 rs_czsc）+ 中枢/背驰/买卖点/多级别联立（自实现，因果式）
+├── smc_engine.py                  # SMC 核心：因果式 FVG/订单块/摆点/BOS/CHoCH（审查修复用户提供代码后重写）
+├── test_smc_engine.py             # smc_engine.py 的合成数据单元测试（信号检测 + 无未来函数自证）
 ├── backtest.py                    # 信号 -> 交易撮合 + 绩效统计（胜率/盈亏比/回撤等）
+├── random_baseline.py             # 随机基线蒙特卡洛显著性检验（可复用模块）
 ├── run_backtest.py                # 单周期回测（1m/5m/30m 各自独立）
 ├── run_backtest_multilevel.py     # 多级别联立回测（30m定方向→5m，5m定方向→1m）
+├── run_smc_backtest.py            # SMC 信号单周期回测（按 FVG/OB/BOS/CHoCH 子集拆解 + 随机基线检验）
+├── run_chan_smc_confluence.py     # 缠论买卖点 + SMC 确认层组合测试
 ├── data/                          # 下载的历史K线（parquet，未提交到 git，需要自行下载）
 └── results/                        # 回测结果（交易明细 csv + 汇总 json，三个币种均有）
 ```
