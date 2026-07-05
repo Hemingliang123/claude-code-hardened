@@ -24,6 +24,10 @@ D5 斜率力度背驰（原著更强调"用更少的时间走出更小的空间"
    价格斜率力度 比上一同向笔更弱
 D6 严格复合定义（价格力度、MACD面积、MACD峰值三者同时走弱——更严格是否更精确？）：
    D1 的条件 AND MACD峰值也走弱
+D7 量价复合定义（用户提问"背驰应该被配合[成交]量吧"——注意这跟 D4 不同：D4 是
+   "只用成交量"单独定义背驰，D7 是在 D1 的价格+MACD复合条件之上，额外要求成交量
+   也同步萎缩，即"量价配合"作为背驰的加强确认条件，而不是替代条件）：
+   D1 的条件 AND 成交量也比上一同向笔更小
 """
 import argparse
 import json
@@ -37,7 +41,8 @@ from chanlun_engine import ChanEngine, Direction, load_bars
 from validate_basic_logic import get_confirmed_bis, HORIZONS
 
 DEFINITIONS = ["D1_复合(价格+MACD面积)", "D2_纯MACD面积", "D3_MACD峰值",
-               "D4_量价背驰", "D5_斜率力度", "D6_严格复合(价格+面积+峰值)"]
+               "D4_量价背驰", "D5_斜率力度", "D6_严格复合(价格+面积+峰值)",
+               "D7_量价配合复合(价格+MACD+成交量三者同时走弱)"]
 
 
 def bi_macd_peak(engine: ChanEngine, bi) -> float:
@@ -95,6 +100,7 @@ def label_beichi(engine, last, prev2, cache: dict) -> dict:
         "D4_量价背驰": weaker_vol,
         "D5_斜率力度": weaker_slope,
         "D6_严格复合(价格+面积+峰值)": weaker_price and weaker_area and weaker_peak,
+        "D7_量价配合复合(价格+MACD+成交量三者同时走弱)": weaker_price and weaker_area and weaker_vol,
     }
 
 

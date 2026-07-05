@@ -49,7 +49,7 @@ chanlun_backtest/
 ├── run_smc_backtest.py            # SMC 信号单周期回测（按 FVG/OB/BOS/CHoCH 子集拆解 + 随机基线检验）
 ├── run_chan_smc_confluence.py     # 缠论买卖点 + SMC 确认层组合测试
 ├── validate_basic_logic.py        # 缠论基本逻辑独立验证（结构自洽性/背驰事件研究/中枢效率比）
-├── validate_beichi_alternatives.py # 背驰核心理论稳健性复核（6种"力度"操作化定义 × 3个时间尺度）
+├── validate_beichi_alternatives.py # 背驰核心理论稳健性复核（7种"力度"操作化定义，含量价配合 × 3个时间尺度）
 ├── validate_beichi_zhongshu_anchored.py # 重读原著后：用真实中枢结构(进入笔/离开笔)重新验证背驰
 ├── duan_engine.py                 # 线段构建（特征序列法），用于"小转大"结构递归级别检验
 ├── test_duan_engine.py            # duan_engine.py 的合成数据单元测试
