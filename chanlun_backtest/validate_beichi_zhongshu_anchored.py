@@ -95,7 +95,7 @@ def zhongshu_anchored_events(engine: ChanEngine, bis, zs_list):
         price_new_extreme = (
             leaving_bi.low < zs_low if direction == Direction.Down else leaving_bi.high > zs_high
         )
-        events.append(dict(entering_bi=entering_bi, leaving_bi=leaving_bi,
+        events.append(dict(entering_bi=entering_bi, leaving_bi=leaving_bi, zs=zs,
                             is_trend=is_trend, price_new_extreme=price_new_extreme))
     return events
 

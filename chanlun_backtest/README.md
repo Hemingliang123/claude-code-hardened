@@ -55,6 +55,7 @@ chanlun_backtest/
 ├── test_duan_engine.py            # duan_engine.py 的合成数据单元测试
 ├── run_duan_confluence.py         # "小转大"检验：固定时钟级别 vs 结构递归级别(线段)多级别联立对比
 ├── validate_duan_consistency.py   # 线段的结构自洽性检验（对齐"笔"的同等检验，补齐此前缺口）
+├── validate_interval_nesting.py   # 区间套二次验证：用次级别独立背驰确认大级别背驰是否可信
 ├── run_chan_random_baseline.py    # 缠论买卖点回测结果的随机基线蒙特卡洛显著性检验（可复现脚本）
 ├── data/                          # 下载的历史K线（parquet，未提交到 git，需要自行下载）
 └── results/                        # 回测结果（交易明细 csv + 汇总 json，三个币种均有）
