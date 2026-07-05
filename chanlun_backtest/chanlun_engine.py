@@ -16,13 +16,18 @@
    则构成一个中枢候选，之后每新增一笔，若其价格区间与 [zd, zg] 仍有重叠则并入中枢延伸，
    直至出现一笔与 [zd, zg] 完全没有重叠（"离开笔"），中枢在此确认结束。
 
-   背驰（用于第一类买卖点）
+   背驰（用于第一类买卖点，中枢锚定）
    ----------------
-   比较"当前笔"与同方向的上一笔（隔一笔）的力度：
+   比较"进入最近一个中枢前的最后一笔"（entering_bi）与"离开该中枢的第一笔"
+   （leaving_bi，即触发信号的 last）的力度：
      a) 价格力度（百分比涨跌幅，见 _bi_price_power，注意不能直接用 czsc 自带的
         power_price，详见下方"已修复的 bug"说明）
      b) MACD 同向面积（该笔覆盖的原始K线上，红/绿柱面积之和）
-   若价格创新高/新低，但 (a) 和 (b) 同时走弱，判定为背驰。
+   若 leaving_bi 价格创新高/新低（相对 entering_bi），但 (a) 和 (b) 同时走弱，
+   判定为背驰。注意：早期版本曾用"隔一笔的上一同向笔"（bi_list[-3]）代替
+   entering_bi，这个简化写法隐含"中枢正好是3笔"的假设，一旦中枢延伸/扩展就会
+   比较到错误的对象——这个 bug 已修复，详见 detect_signals 内的注释和
+   BASIC_LOGIC_VALIDATION.md 第2.5节。
 
    三类买卖点
    ----------------
@@ -215,26 +220,49 @@ class ChanEngine:
         last = bi_list[-1]
         zs_list = self.build_zhongshu_list(bi_list[:-1])  # 中枢基于"上一笔为止"的历史构建
 
-        # ---------- 一类买卖点：背驰 ----------
-        if len(bi_list) >= 3:
-            prev_same_dir = bi_list[-3]  # 上一同向笔
-            if prev_same_dir.direction == last.direction:
-                price_new_extreme = (
-                    last.low < prev_same_dir.low if last.direction == Direction.Down
-                    else last.high > prev_same_dir.high
-                )
-                if price_new_extreme:
-                    weaker_price = self._bi_price_power(last) < self._bi_price_power(prev_same_dir)
-                    weaker_macd = self._bi_macd_area(last) < self._bi_macd_area(prev_same_dir)
-                    if weaker_price and weaker_macd:
-                        kind = "一买" if last.direction == Direction.Down else "一卖"
-                        side = "buy" if kind == "一买" else "sell"
-                        points.append(BSPoint(kind, side, last.fx_b.dt, last.fx_b.fx, last.fx_b.raw_bars[-1].id))
-                        last_idx = len(bi_list) - 1
-                        if kind == "一买":
-                            self._last_1b_idx = last_idx
-                        else:
-                            self._last_1s_idx = last_idx
+        # ---------- 一类买卖点：背驰（中枢锚定，已修复 bug） ----------
+        # 已修复的 bug：此前直接用 bi_list[-3]（隔一笔的上一同向笔）作为背驰的比较对象，
+        # 隐含假设"中枢正好是标准的3笔"——一旦中枢发生延伸/扩展（笔数>3，这在实测数据里
+        # 很常见），bi_list[-3] 实际上落在中枢内部，而不是"进入中枢前的最后一笔"，比较的
+        # 两笔根本不构成缠中说禅原著定义的背驰对象（原著："趋势背驰是指围绕同一中枢的
+        # 前后两个次级别波动，后边的力度弱于前面"；"盘整背驰...比较的关键在于选取可以
+        # 比较的两段走势"——都是围绕同一个中枢的"进入笔"与"离开笔"，不是随意隔一笔）。
+        # 详见 BASIC_LOGIC_VALIDATION.md 第2.5节（重新审视背驰定义）的完整分析。
+        #
+        # 修复方式：判断 last 是否恰好是"刚离开 zs_list 最后一个中枢"的那一笔——即该中枢
+        # 的候选延伸区间正好到上一笔为止（zs.end_idx == len(bi_list)-2），且 last 的价格
+        # 区间与中枢核心区间 [zd, zg] 完全没有重叠。若是，则用"进入该中枢前的最后一笔"
+        # （entering_bi，即中枢起始笔再往前一笔）与 last（离开笔）做力度对比。
+        #
+        # 关于"是否要求 last 创新高/新低"：原著把背驰分为趋势背驰（要求创新高/新低，且
+        # 前提是已存在≥2个不重叠的同级别中枢）与盘整背驰（只有1个中枢时就可能出现，
+        # "不需要考虑是否创新高或者新低"）。经实测（见 BASIC_LOGIC_VALIDATION.md 2.5节），
+        # 严格要求 last 相对 entering_bi 创新高/新低会让信号数量趋近于0（在真实高波动
+        # 加密货币数据上，绝大多数中枢的离开笔根本无法突破进入笔的极值），这与原著描述
+        # "第二个中枢后趋势背驰占绝大多数"的经验并不吻合，更接近于操作化偏差而非市场
+        # 真的几乎不发生延续。因此这里采用盘整背驰的口径（不要求创新高/新低），让一类
+        # 买卖点的产生频率保持在可用范围内，这也是业界多数实现的常见做法。
+        if zs_list:
+            zs = zs_list[-1]
+            if zs.end_idx == len(bi_list) - 2:
+                no_overlap = last.high < zs.zd or last.low > zs.zg
+                if no_overlap:
+                    entering_idx = zs.start_idx - 1
+                    if entering_idx >= 0:
+                        entering_bi = bi_list[entering_idx]
+                        if entering_bi.direction == last.direction:  # 延续（而非反转），才谈得上背驰
+                            weaker_price = self._bi_price_power(last) < self._bi_price_power(entering_bi)
+                            weaker_macd = self._bi_macd_area(last) < self._bi_macd_area(entering_bi)
+                            if weaker_price and weaker_macd:
+                                kind = "一买" if last.direction == Direction.Down else "一卖"
+                                side = "buy" if kind == "一买" else "sell"
+                                points.append(BSPoint(kind, side, last.fx_b.dt, last.fx_b.fx,
+                                                       last.fx_b.raw_bars[-1].id))
+                                last_idx = len(bi_list) - 1
+                                if kind == "一买":
+                                    self._last_1b_idx = last_idx
+                                else:
+                                    self._last_1s_idx = last_idx
 
         # ---------- 二类买卖点（严格锚定在真实一类买卖点之后） ----------
         # 标准定义：一买（一卖）之后，价格反向运行一笔，再次出现同向笔，
