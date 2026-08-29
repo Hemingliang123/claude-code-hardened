@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from html import escape
+from html import escape, unescape
 import json
 import math
 from pathlib import Path
+import re
 from statistics import mean
 from typing import Iterable
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import ProxyHandler, Request, build_opener
 
 from .sample_data import TREND_DATES, get_sample_items
 
@@ -18,6 +22,12 @@ PLATFORM_LABELS = {
     "taobao": "淘宝",
     "pdd": "拼多多",
 }
+
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+)
+LIVE_REQUEST_TIMEOUT = 12
 
 
 class LiveCollectionUnavailable(RuntimeError):
@@ -83,20 +93,180 @@ class ProviderBase:
             "若需要真实抓取，请在该 provider 中接入官方 API 或浏览器自动化会话。"
         )
 
+    def _request_live_page(self, url: str, params: dict[str, str | int] | None = None) -> tuple[str, str]:
+        query = urlencode(params or {}, doseq=True)
+        target_url = f"{url}?{query}" if query else url
+        request = Request(
+            target_url,
+            headers={
+                "User-Agent": DEFAULT_USER_AGENT,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            },
+        )
+        opener = build_opener(ProxyHandler())
+        try:
+            with opener.open(request, timeout=LIVE_REQUEST_TIMEOUT) as response:
+                charset = response.headers.get_content_charset() or "utf-8"
+                body = response.read().decode(charset, errors="replace")
+                return response.geturl(), body
+        except HTTPError as exc:
+            raise LiveCollectionUnavailable(
+                f"{self.label} live 请求失败，HTTP {exc.code}: {target_url}"
+            ) from exc
+        except URLError as exc:
+            reason = getattr(exc, "reason", exc)
+            raise LiveCollectionUnavailable(
+                f"{self.label} live 请求失败，网络不可用: {reason}"
+            ) from exc
+
+
+def _normalize_whitespace(text: str) -> str:
+    return re.sub(r"\s+", " ", unescape(text)).strip()
+
+
+def _parse_price_text(price_text: str) -> float | None:
+    match = re.search(r"(\d+(?:\.\d+)?)", price_text.replace(",", ""))
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
+
+
+def _extract_quoted_json(text: str, pattern: str) -> dict | None:
+    match = re.search(pattern, text, flags=re.S)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None
+
+
+def _raise_live_unavailable(label: str, reason: str, final_url: str) -> None:
+    raise LiveCollectionUnavailable(f"{label} live 已发起真实请求，但{reason}。最终地址: {final_url}")
+
 
 class JdProvider(ProviderBase):
     platform = "jd"
     label = "京东"
+
+    def _collect_live(self, keyword: str, limit: int) -> list[ProductRecord]:
+        final_url, html = self._request_live_page(
+            "https://search.jd.com/Search",
+            params={"keyword": keyword},
+        )
+        if "passport.jd.com" in final_url:
+            _raise_live_unavailable(self.label, "被重定向到登录页", final_url)
+        if 'id="J_goodsList"' not in html and 'class="gl-item"' not in html:
+            _raise_live_unavailable(
+                self.label,
+                "当前返回为前端骨架页或动态渲染页，未暴露可稳定解析的商品列表",
+                final_url,
+            )
+        _raise_live_unavailable(
+            self.label,
+            "当前匿名页面结构未稳定暴露价格与店铺字段，暂未接入官方 API 凭证",
+            final_url,
+        )
 
 
 class TaobaoProvider(ProviderBase):
     platform = "taobao"
     label = "淘宝"
 
+    def _collect_live(self, keyword: str, limit: int) -> list[ProductRecord]:
+        final_url, html = self._request_live_page(
+            "https://s.taobao.com/search",
+            params={"q": keyword},
+        )
+        if "login.taobao.com" in final_url:
+            _raise_live_unavailable(self.label, "被重定向到登录页", final_url)
+
+        item_cards = re.findall(
+            (
+                r'<a[^>]+href="(?P<url>//item\.taobao\.com/item\.htm[^"]+)"[^>]*>'
+                r'(?P<block>.*?)</a>'
+            ),
+            html,
+            flags=re.S,
+        )
+        records: list[ProductRecord] = []
+        for raw_url, block in item_cards:
+            title = _normalize_whitespace(re.sub(r"<[^>]+>", " ", block))
+            price = _parse_price_text(block)
+            if not title or price is None:
+                continue
+            records.append(
+                ProductRecord(
+                    platform=self.platform,
+                    keyword=keyword,
+                    title=title,
+                    price=price,
+                    sales=0,
+                    shop="未知店铺",
+                    shop_rating=0.0,
+                    url=f"https:{raw_url}" if raw_url.startswith("//") else raw_url,
+                    price_history=[price for _ in TREND_DATES],
+                )
+            )
+            if len(records) >= limit:
+                break
+
+        if records:
+            return records
+
+        if '"routePath":"/mainSearch"' in html or "请不要禁用JS" in html:
+            _raise_live_unavailable(
+                self.label,
+                "当前返回为 CSR 骨架页，真实商品列表依赖浏览器会话与后续动态接口",
+                final_url,
+            )
+
+        search_result = _extract_quoted_json(
+            html,
+            r"window\.__SEARCH_RESULT__\s*=\s*(\{.*?\})\s*;</script>",
+        )
+        if search_result:
+            _raise_live_unavailable(
+                self.label,
+                "已发现预载状态入口，但当前页面未包含可直接落库的标准商品字段",
+                final_url,
+            )
+
+        _raise_live_unavailable(
+            self.label,
+            "未解析到稳定商品卡片，当前需登录态或浏览器 API 回放才能继续",
+            final_url,
+        )
+
 
 class PddProvider(ProviderBase):
     platform = "pdd"
     label = "拼多多"
+
+    def _collect_live(self, keyword: str, limit: int) -> list[ProductRecord]:
+        final_url, html = self._request_live_page(
+            "https://mobile.yangkeduo.com/search_result.html",
+            params={"search_key": keyword},
+        )
+        if "/login.html" in final_url:
+            _raise_live_unavailable(self.label, "被重定向到登录页", final_url)
+        if 'id="main"' in html and "__SSR_STREAM_END__" in html:
+            _raise_live_unavailable(
+                self.label,
+                "当前返回为移动端壳页面，商品数据需要后续 JS 拉取",
+                final_url,
+            )
+        _raise_live_unavailable(
+            self.label,
+            "匿名访问未返回可稳定解析的商品列表，暂未接入商家 API 凭证",
+            final_url,
+        )
 
 
 PROVIDERS = {
@@ -217,9 +387,11 @@ def collect_price_data(
     platforms: list[str] | None = None,
     limit: int = 5,
     mode: str = "sample",
-    allow_sample_fallback: bool = True,
+    allow_sample_fallback: bool | None = None,
 ) -> dict:
     keyword = repair_mojibake(keyword.strip())
+    if allow_sample_fallback is None:
+        allow_sample_fallback = mode != "live"
     selected_platforms = platforms or list(PROVIDERS.keys())
     warnings: list[str] = []
     raw_records: list[ProductRecord] = []
@@ -237,6 +409,9 @@ def collect_price_data(
             if allow_sample_fallback:
                 raw_records.extend(provider.collect(keyword=keyword, limit=limit, mode="sample"))
                 warnings.append(f"{provider.label} 已自动回退到 sample 模式。")
+
+    if mode == "live" and not raw_records:
+        warnings.append("live 模式本次未采集到真实商品数据，可切回 sample 模式查看演示闭环。")
 
     cleaned_records = deduplicate_records(raw_records)
     score_records(cleaned_records)

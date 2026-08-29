@@ -1,0 +1,18 @@
+{
+  "keyword": "蓝牙耳机",
+  "mode": "live",
+  "generated_at": "2026-08-29T22:16:21",
+  "warnings": [
+    "京东 live 已发起真实请求，但当前返回为前端骨架页或动态渲染页，未暴露可稳定解析的商品列表。最终地址: https://search.jd.com/Search?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+    "淘宝 live 已发起真实请求，但当前返回为 CSR 骨架页，真实商品列表依赖浏览器会话与后续动态接口。最终地址: https://s.taobao.com/search?q=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+    "拼多多 live 已发起真实请求，但当前返回为移动端壳页面，商品数据需要后续 JS 拉取。最终地址: https://mobile.yangkeduo.com/search_result.html?search_key=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+    "live 模式本次未采集到真实商品数据，可切回 sample 模式查看演示闭环。"
+  ],
+  "items": [],
+  "recommendations": [],
+  "summary": [],
+  "trend": {
+    "dates": [],
+    "series": []
+  }
+}

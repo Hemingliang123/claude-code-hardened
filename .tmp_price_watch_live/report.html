@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>蓝牙耳机 - 电商价格对比报告</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050816;
+      --panel: rgba(15, 23, 42, 0.88);
+      --line: rgba(148, 163, 184, 0.22);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #67e8f9;
+      --accent-2: #f472b6;
+      --accent-3: #facc15;
+      --shadow: 0 18px 50px rgba(2, 8, 23, 0.45);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(103, 232, 249, 0.16), transparent 28%),
+        radial-gradient(circle at top right, rgba(244, 114, 182, 0.12), transparent 24%),
+        linear-gradient(180deg, #020617 0%, #0f172a 48%, #020617 100%);
+      color: var(--text);
+    }
+    .page {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 36px 0 64px;
+    }
+    .hero {
+      padding: 32px;
+      border: 1px solid rgba(103, 232, 249, 0.18);
+      border-radius: 28px;
+      background: linear-gradient(135deg, rgba(8, 15, 30, 0.96), rgba(15, 23, 42, 0.72));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .eyebrow {
+      color: var(--accent);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(32px, 5vw, 56px);
+      line-height: 1.02;
+    }
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 760px;
+      line-height: 1.7;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 22px;
+    }
+    .meta-chip {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .section-title {
+      margin: 34px 0 14px;
+      font-size: 22px;
+    }
+    .summary-grid,
+    .recommend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .summary-card,
+    .recommend-card,
+    .table-card,
+    .chart-card,
+    .warning-box,
+    .raw-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+    .summary-card,
+    .recommend-card,
+    .warning-box,
+    .raw-card {
+      padding: 20px;
+    }
+    .summary-platform,
+    .recommend-top {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .summary-price,
+    .recommend-price {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .summary-meta,
+    .summary-desc,
+    .recommend-score,
+    .recommend-tag,
+    .warning-box li {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .recommend-card h3 {
+      margin: 0 0 14px;
+      font-size: 21px;
+      line-height: 1.35;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .chart-card {
+      padding: 24px;
+      margin-top: 16px;
+    }
+    .chart-title {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+    .trend-svg {
+      width: 100%;
+      height: auto;
+    }
+    .table-card {
+      overflow: auto;
+      margin-top: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 840px;
+    }
+    th,
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      font-size: 14px;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+    .warning-box {
+      margin-top: 16px;
+      border-color: rgba(250, 204, 21, 0.22);
+    }
+    .warning-box h3,
+    .raw-card h3 {
+      margin-top: 0;
+    }
+    .raw-card {
+      margin-top: 16px;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #cbd5e1;
+      background: rgba(2, 6, 23, 0.68);
+      padding: 16px;
+      border-radius: 18px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="eyebrow">Price Watch Demo</div>
+      <h1>蓝牙耳机 价格自动化对比</h1>
+      <p>该报告由本地命令行工具直接生成，包含按平台采集后的清洗去重、价格排序、横向对比、价格趋势与高性价比推荐结果。</p>
+      <div class="meta-row">
+        <div class="meta-chip">采集模式：live</div>
+        <div class="meta-chip">记录数：0</div>
+        <div class="meta-chip">生成时间：2026-08-29T22:16:21</div>
+      </div>
+    </section>
+    <h2 class="section-title">平台摘要</h2>
+    <section class="summary-grid"></section>
+    <h2 class="section-title">性价比推荐</h2>
+    <section class="recommend-grid"></section>
+    <h2 class="section-title">价格趋势</h2>
+    <div class='empty-chart'>暂无趋势数据</div>
+    <h2 class="section-title">商品明细</h2>
+    <section class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>平台</th>
+            <th>商品名</th>
+            <th>价格</th>
+            <th>销量</th>
+            <th>店铺评分</th>
+            <th>推荐标记</th>
+            <th>链接</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+    <section class='warning-box'><h3>运行提示</h3><ul><li>京东 live 已发起真实请求，但当前返回为前端骨架页或动态渲染页，未暴露可稳定解析的商品列表。最终地址: https://search.jd.com/Search?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA</li><li>淘宝 live 已发起真实请求，但当前返回为 CSR 骨架页，真实商品列表依赖浏览器会话与后续动态接口。最终地址: https://s.taobao.com/search?q=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA</li><li>拼多多 live 已发起真实请求，但当前返回为移动端壳页面，商品数据需要后续 JS 拉取。最终地址: https://mobile.yangkeduo.com/search_result.html?search_key=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA</li><li>live 模式本次未采集到真实商品数据，可切回 sample 模式查看演示闭环。</li></ul></section>
+    <section class="raw-card">
+      <h3>结果 JSON 示例</h3>
+      <pre>{
+  &quot;keyword&quot;: &quot;蓝牙耳机&quot;,
+  &quot;mode&quot;: &quot;live&quot;,
+  &quot;generated_at&quot;: &quot;2026-08-29T22:16:21&quot;,
+  &quot;warnings&quot;: [
+    &quot;京东 live 已发起真实请求，但当前返回为前端骨架页或动态渲染页，未暴露可稳定解析的商品列表。最终地址: https://search.jd.com/Search?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA&quot;,
+    &quot;淘宝 live 已发起真实请求，但当前返回为 CSR 骨架页，真实商品列表依赖浏览器会话与后续动态接口。最终地址: https://s.taobao.com/search?q=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA&quot;,
+    &quot;拼多多 live 已发起真实请求，但当前返回为移动端壳页面，商品数据需要后续 JS 拉取。最终地址: https://mobile.yangkeduo.com/search_result.html?search_key=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA&quot;,
+    &quot;live 模式本次未采集到真实商品数据，可切回 sample 模式查看演示闭环。&quot;
+  ],
+  &quot;items&quot;: [],
+  &quot;recommendations&quot;: [],
+  &quot;summary&quot;: [],
+  &quot;trend&quot;: {
+    &quot;dates&quot;: [],
+    &quot;series&quot;: []
+  }
+}</pre>
+    </section>
+  </main>
+</body>
+</html>

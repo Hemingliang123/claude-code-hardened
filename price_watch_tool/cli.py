@@ -53,6 +53,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="同时将结果打印到标准输出",
     )
+    collect_parser.add_argument(
+        "--allow-sample-fallback",
+        action="store_true",
+        help="live 模式失败时允许自动回退到 sample 数据",
+    )
 
     serve_parser = subparsers.add_parser("serve", help="启动演示网页")
     serve_parser.add_argument("--host", default="127.0.0.1", help="监听地址")
@@ -69,6 +74,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="网页默认采集模式",
     )
     serve_parser.add_argument("--limit", type=int, default=4, help="每个平台默认采集条数")
+    serve_parser.add_argument(
+        "--allow-sample-fallback",
+        action="store_true",
+        help="网页在 live 模式失败时允许自动回退到 sample 数据",
+    )
 
     return parser
 
@@ -79,6 +89,7 @@ def run_collect(args: argparse.Namespace) -> int:
         platforms=args.platforms,
         limit=args.limit,
         mode=args.mode,
+        allow_sample_fallback=args.allow_sample_fallback,
     )
     output_dir = Path(args.output_dir)
     paths = export_result_files(payload, output_dir=output_dir)
@@ -106,6 +117,7 @@ def run_serve(args: argparse.Namespace) -> int:
         initial_keyword=args.keyword,
         default_mode=args.mode,
         default_limit=args.limit,
+        allow_sample_fallback=args.allow_sample_fallback,
     )
     return 0
 

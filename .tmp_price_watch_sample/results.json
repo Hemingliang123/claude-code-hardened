@@ -1,0 +1,424 @@
+{
+  "keyword": "蓝牙耳机",
+  "mode": "sample",
+  "generated_at": "2026-08-29T22:15:03",
+  "warnings": [],
+  "items": [
+    {
+      "platform": "pdd",
+      "keyword": "蓝牙耳机",
+      "title": "联想 LP40 Pro 蓝牙耳机 入门高配版",
+      "price": 89.0,
+      "sales": 52800,
+      "shop": "联想数码拼购店",
+      "shop_rating": 4.6,
+      "url": "https://demo.local/pdd/lenovo-lp40-pro?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        109.0,
+        105.0,
+        102.0,
+        98.0,
+        95.0,
+        92.0,
+        89.0
+      ],
+      "value_score": 0.984,
+      "recommendation": "高性价比推荐 / 最低价",
+      "platform_label": "拼多多"
+    },
+    {
+      "platform": "pdd",
+      "keyword": "蓝牙耳机",
+      "title": "QCY AilyBuds Lite 蓝牙耳机 百亿补贴",
+      "price": 119.0,
+      "sales": 36200,
+      "shop": "QCY 拼多多品牌店",
+      "shop_rating": 4.7,
+      "url": "https://demo.local/pdd/qcy-ailybuds-lite?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        139.0,
+        135.0,
+        132.0,
+        128.0,
+        125.0,
+        122.0,
+        119.0
+      ],
+      "value_score": 0.8624,
+      "recommendation": "高性价比推荐",
+      "platform_label": "拼多多"
+    },
+    {
+      "platform": "jd",
+      "keyword": "蓝牙耳机",
+      "title": "QCY AilyBuds Lite 蓝牙耳机 长续航版",
+      "price": 139.0,
+      "sales": 28400,
+      "shop": "QCY 京东旗舰店",
+      "shop_rating": 4.7,
+      "url": "https://demo.local/jd/qcy-ailybuds-lite?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        159.0,
+        155.0,
+        149.0,
+        145.0,
+        143.0,
+        141.0,
+        139.0
+      ],
+      "value_score": 0.8062,
+      "recommendation": "高性价比推荐",
+      "platform_label": "京东"
+    },
+    {
+      "platform": "taobao",
+      "keyword": "蓝牙耳机",
+      "title": "OPPO Enco Air4 蓝牙耳机 低延迟游戏款",
+      "price": 179.0,
+      "sales": 12000,
+      "shop": "OPPO 官方旗舰店",
+      "shop_rating": 4.8,
+      "url": "https://demo.local/taobao/oppo-enco-air4?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        199.0,
+        195.0,
+        191.0,
+        188.0,
+        185.0,
+        182.0,
+        179.0
+      ],
+      "value_score": 0.7181,
+      "recommendation": "常规候选",
+      "platform_label": "淘宝"
+    },
+    {
+      "platform": "taobao",
+      "keyword": "蓝牙耳机",
+      "title": "倍思 Bowie M2s 蓝牙耳机 旗舰升级版",
+      "price": 209.0,
+      "sales": 18100,
+      "shop": "Baseus 天猫旗舰店",
+      "shop_rating": 4.8,
+      "url": "https://demo.local/taobao/bowie-m2s?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        229.0,
+        225.0,
+        222.0,
+        219.0,
+        215.0,
+        212.0,
+        209.0
+      ],
+      "value_score": 0.6992,
+      "recommendation": "常规候选",
+      "platform_label": "淘宝"
+    },
+    {
+      "platform": "jd",
+      "keyword": "蓝牙耳机",
+      "title": "倍思 Bowie M2s 蓝牙耳机 Hi-Res 低延迟",
+      "price": 219.0,
+      "sales": 15200,
+      "shop": "Baseus 京东旗舰店",
+      "shop_rating": 4.8,
+      "url": "https://demo.local/jd/bowie-m2s?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        239.0,
+        235.0,
+        232.0,
+        229.0,
+        225.0,
+        222.0,
+        219.0
+      ],
+      "value_score": 0.6848,
+      "recommendation": "常规候选",
+      "platform_label": "京东"
+    },
+    {
+      "platform": "pdd",
+      "keyword": "蓝牙耳机",
+      "title": "小米 Buds 5 蓝牙耳机 百亿补贴",
+      "price": 249.0,
+      "sales": 14300,
+      "shop": "小米拼购官方店",
+      "shop_rating": 4.8,
+      "url": "https://demo.local/pdd/xiaomi-buds-5?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        275.0,
+        269.0,
+        265.0,
+        261.0,
+        257.0,
+        253.0,
+        249.0
+      ],
+      "value_score": 0.6608,
+      "recommendation": "常规候选",
+      "platform_label": "拼多多"
+    },
+    {
+      "platform": "jd",
+      "keyword": "蓝牙耳机",
+      "title": "小米 Buds 5 蓝牙耳机 空间音频款",
+      "price": 269.0,
+      "sales": 9700,
+      "shop": "小米京东自营店",
+      "shop_rating": 4.8,
+      "url": "https://demo.local/jd/xiaomi-buds-5?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        289.0,
+        285.0,
+        282.0,
+        279.0,
+        276.0,
+        272.0,
+        269.0
+      ],
+      "value_score": 0.6364,
+      "recommendation": "常规候选",
+      "platform_label": "京东"
+    },
+    {
+      "platform": "pdd",
+      "keyword": "蓝牙耳机",
+      "title": "漫步者 NeoBuds Pro 蓝牙耳机 秒杀特惠",
+      "price": 299.0,
+      "sales": 9800,
+      "shop": "漫步者拼购专卖店",
+      "shop_rating": 4.7,
+      "url": "https://demo.local/pdd/neobuds-pro?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        325.0,
+        319.0,
+        315.0,
+        311.0,
+        307.0,
+        303.0,
+        299.0
+      ],
+      "value_score": 0.6177,
+      "recommendation": "常规候选",
+      "platform_label": "拼多多"
+    },
+    {
+      "platform": "taobao",
+      "keyword": "蓝牙耳机",
+      "title": "漫步者 NeoBuds Pro 蓝牙耳机 主动降噪版",
+      "price": 319.0,
+      "sales": 6400,
+      "shop": "漫步者天猫旗舰店",
+      "shop_rating": 4.9,
+      "url": "https://demo.local/taobao/neobuds-pro?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        339.0,
+        336.0,
+        333.0,
+        329.0,
+        326.0,
+        323.0,
+        319.0
+      ],
+      "value_score": 0.6036,
+      "recommendation": "口碑优",
+      "platform_label": "淘宝"
+    },
+    {
+      "platform": "jd",
+      "keyword": "蓝牙耳机",
+      "title": "漫步者 NeoBuds Pro 蓝牙耳机 主动降噪版",
+      "price": 329.0,
+      "sales": 8600,
+      "shop": "京东自营旗舰店",
+      "shop_rating": 4.9,
+      "url": "https://demo.local/jd/neobuds-pro?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        359.0,
+        349.0,
+        345.0,
+        339.0,
+        335.0,
+        332.0,
+        329.0
+      ],
+      "value_score": 0.6093,
+      "recommendation": "口碑优",
+      "platform_label": "京东"
+    },
+    {
+      "platform": "taobao",
+      "keyword": "蓝牙耳机",
+      "title": "索尼 WF-C700N 蓝牙耳机 店播专享套装",
+      "price": 459.0,
+      "sales": 5300,
+      "shop": "Sony 淘宝旗舰店",
+      "shop_rating": 4.9,
+      "url": "https://demo.local/taobao/sony-c700n?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        499.0,
+        489.0,
+        485.0,
+        479.0,
+        469.0,
+        465.0,
+        459.0
+      ],
+      "value_score": 0.5593,
+      "recommendation": "口碑优",
+      "platform_label": "淘宝"
+    }
+  ],
+  "recommendations": [
+    {
+      "platform": "pdd",
+      "keyword": "蓝牙耳机",
+      "title": "联想 LP40 Pro 蓝牙耳机 入门高配版",
+      "price": 89.0,
+      "sales": 52800,
+      "shop": "联想数码拼购店",
+      "shop_rating": 4.6,
+      "url": "https://demo.local/pdd/lenovo-lp40-pro?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        109.0,
+        105.0,
+        102.0,
+        98.0,
+        95.0,
+        92.0,
+        89.0
+      ],
+      "value_score": 0.984,
+      "recommendation": "高性价比推荐 / 最低价",
+      "platform_label": "拼多多"
+    },
+    {
+      "platform": "pdd",
+      "keyword": "蓝牙耳机",
+      "title": "QCY AilyBuds Lite 蓝牙耳机 百亿补贴",
+      "price": 119.0,
+      "sales": 36200,
+      "shop": "QCY 拼多多品牌店",
+      "shop_rating": 4.7,
+      "url": "https://demo.local/pdd/qcy-ailybuds-lite?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        139.0,
+        135.0,
+        132.0,
+        128.0,
+        125.0,
+        122.0,
+        119.0
+      ],
+      "value_score": 0.8624,
+      "recommendation": "高性价比推荐",
+      "platform_label": "拼多多"
+    },
+    {
+      "platform": "jd",
+      "keyword": "蓝牙耳机",
+      "title": "QCY AilyBuds Lite 蓝牙耳机 长续航版",
+      "price": 139.0,
+      "sales": 28400,
+      "shop": "QCY 京东旗舰店",
+      "shop_rating": 4.7,
+      "url": "https://demo.local/jd/qcy-ailybuds-lite?keyword=%E8%93%9D%E7%89%99%E8%80%B3%E6%9C%BA",
+      "price_history": [
+        159.0,
+        155.0,
+        149.0,
+        145.0,
+        143.0,
+        141.0,
+        139.0
+      ],
+      "value_score": 0.8062,
+      "recommendation": "高性价比推荐",
+      "platform_label": "京东"
+    }
+  ],
+  "summary": [
+    {
+      "platform": "pdd",
+      "platform_label": "拼多多",
+      "count": 4,
+      "lowest_price": 89.0,
+      "average_price": 189.0,
+      "average_sales": 28275,
+      "average_rating": 4.7,
+      "cheapest_title": "联想 LP40 Pro 蓝牙耳机 入门高配版"
+    },
+    {
+      "platform": "jd",
+      "platform_label": "京东",
+      "count": 4,
+      "lowest_price": 139.0,
+      "average_price": 239.0,
+      "average_sales": 15475,
+      "average_rating": 4.8,
+      "cheapest_title": "QCY AilyBuds Lite 蓝牙耳机 长续航版"
+    },
+    {
+      "platform": "taobao",
+      "platform_label": "淘宝",
+      "count": 4,
+      "lowest_price": 179.0,
+      "average_price": 291.5,
+      "average_sales": 10450,
+      "average_rating": 4.85,
+      "cheapest_title": "OPPO Enco Air4 蓝牙耳机 低延迟游戏款"
+    }
+  ],
+  "trend": {
+    "dates": [
+      "2026-08-24",
+      "2026-08-25",
+      "2026-08-26",
+      "2026-08-27",
+      "2026-08-28",
+      "2026-08-29",
+      "2026-08-30"
+    ],
+    "series": [
+      {
+        "platform": "pdd",
+        "platform_label": "拼多多",
+        "values": [
+          212.0,
+          207.0,
+          203.5,
+          199.5,
+          196.0,
+          192.5,
+          189.0
+        ]
+      },
+      {
+        "platform": "jd",
+        "platform_label": "京东",
+        "values": [
+          261.5,
+          256.0,
+          252.0,
+          248.0,
+          244.75,
+          241.75,
+          239.0
+        ]
+      },
+      {
+        "platform": "taobao",
+        "platform_label": "淘宝",
+        "values": [
+          316.5,
+          311.25,
+          307.75,
+          303.75,
+          298.75,
+          295.5,
+          291.5
+        ]
+      }
+    ]
+  }
+}

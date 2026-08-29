@@ -11,13 +11,19 @@ from urllib.parse import parse_qs, urlparse
 from .core import PLATFORM_LABELS, collect_price_data
 
 
-def _page_html(initial_payload: dict, default_mode: str, default_limit: int) -> str:
+def _page_html(
+    initial_payload: dict,
+    default_mode: str,
+    default_limit: int,
+    default_allow_sample_fallback: bool,
+) -> str:
     initial_json = json.dumps(initial_payload, ensure_ascii=False)
     sample_request = {
         "keyword": initial_payload["keyword"],
         "mode": default_mode,
         "limit": default_limit,
         "platforms": list(PLATFORM_LABELS.keys()),
+        "allow_sample_fallback": default_allow_sample_fallback,
     }
     request_json = json.dumps(sample_request, ensure_ascii=False, indent=2)
     result_example = json.dumps(initial_payload["recommendations"][0], ensure_ascii=False, indent=2)
@@ -352,6 +358,10 @@ def _page_html(initial_payload: dict, default_mode: str, default_limit: int) -> 
                     <button type="button" class="secondary sample-button" data-keyword="机械键盘">机械键盘示例</button>
                     <button type="button" class="secondary sample-button" data-keyword="手机壳">手机壳示例</button>
                   </div>
+                  <label class="platform-option" style="width: fit-content;">
+                    <input id="allowFallback" type="checkbox" {"checked" if default_allow_sample_fallback else ""} />
+                    live 失败时回退 sample
+                  </label>
                   <div id="status" class="status"></div>
                 </div>
               </section>
@@ -547,7 +557,8 @@ def _page_html(initial_payload: dict, default_mode: str, default_limit: int) -> 
                 keyword: payload.keyword,
                 mode: payload.mode,
                 limit: payload.items.length ? Math.floor(payload.items.length / 3) : 4,
-                platforms: ['jd', 'taobao', 'pdd']
+                platforms: ['jd', 'taobao', 'pdd'],
+                allow_sample_fallback: document.getElementById('allowFallback').checked
               }}, null, 2);
             }}
 
@@ -579,7 +590,8 @@ def _page_html(initial_payload: dict, default_mode: str, default_limit: int) -> 
                 keyword,
                 mode,
                 limit,
-                platforms: platforms.join(',')
+                platforms: platforms.join(','),
+                allow_sample_fallback: document.getElementById('allowFallback').checked ? '1' : '0'
               }});
               try {{
                 const response = await fetch(`/api/collect?${{query.toString()}}`);
@@ -617,17 +629,20 @@ def run_demo_server(
     initial_keyword: str = "蓝牙耳机",
     default_mode: str = "sample",
     default_limit: int = 4,
+    allow_sample_fallback: bool = False,
 ) -> None:
     initial_payload = collect_price_data(
         keyword=initial_keyword,
         mode=default_mode,
         limit=default_limit,
         platforms=list(PLATFORM_LABELS.keys()),
+        allow_sample_fallback=allow_sample_fallback,
     )
     page_html = _page_html(
         initial_payload=initial_payload,
         default_mode=default_mode,
         default_limit=default_limit,
+        default_allow_sample_fallback=allow_sample_fallback,
     ).encode("utf-8")
 
     class DemoHandler(BaseHTTPRequestHandler):
@@ -656,6 +671,10 @@ def run_demo_server(
                 limit = int(params.get("limit", [str(default_limit)])[0])
             except ValueError:
                 limit = default_limit
+            allow_sample_fallback_raw = params.get(
+                "allow_sample_fallback",
+                ["1" if allow_sample_fallback else "0"],
+            )[0]
             platforms_raw = params.get("platforms", [",".join(PLATFORM_LABELS.keys())])[0]
             platforms = [item.strip() for item in platforms_raw.split(",") if item.strip()]
             payload = collect_price_data(
@@ -663,6 +682,7 @@ def run_demo_server(
                 mode=mode if mode in {"sample", "live"} else default_mode,
                 limit=max(1, min(limit, 10)),
                 platforms=platforms,
+                allow_sample_fallback=allow_sample_fallback_raw in {"1", "true", "yes", "on"},
             )
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             self.send_response(HTTPStatus.OK)

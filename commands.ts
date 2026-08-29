@@ -139,6 +139,7 @@ import heapDump from './commands/heapdump/index.js'
 import mockLimits from './commands/mock-limits/index.js'
 import bridgeKick from './commands/bridge-kick.js'
 import version from './commands/version.js'
+import priceWatch from './commands/price-watch/index.js'
 import summary from './commands/summary/index.js'
 import {
   resetLimits,
@@ -289,6 +290,7 @@ const COMMANDS = memoize((): Command[] => [
   mobile,
   model,
   outputStyle,
+  priceWatch,
   remoteEnv,
   plugin,
   pr_comments,
