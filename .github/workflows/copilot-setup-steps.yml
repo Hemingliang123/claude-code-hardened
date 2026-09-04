@@ -12,6 +12,8 @@ on:
 jobs:
   copilot-setup-steps:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       ANTHROPIC_MODEL: sweagent-capi:claude-sonnet-5
     steps:
