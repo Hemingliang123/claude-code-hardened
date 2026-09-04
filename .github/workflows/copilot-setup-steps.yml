@@ -1,0 +1,20 @@
+name: Copilot Setup Steps
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Force a supported default model for Copilot cloud agent
+        run: |
+          echo "ANTHROPIC_MODEL=sweagent-capi:claude-sonnet-5" >> "$GITHUB_ENV"
