@@ -15,7 +15,7 @@ jobs:
     permissions:
       contents: read
     env:
-      ANTHROPIC_MODEL: sweagent-capi:claude-sonnet-5
+      ANTHROPIC_MODEL: "sweagent-capi:claude-sonnet-5"
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
